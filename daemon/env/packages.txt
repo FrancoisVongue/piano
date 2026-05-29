@@ -1,0 +1,52 @@
+# APT packages installed in piano-base.
+# One package per line. Lines starting with # are ignored.
+#
+# Piano-base is self-contained: everything a machine needs is here.
+# User installs extras via `sudo apt install` (persists in overlay upper).
+
+# Shell — zsh is the default and only shell piano uses.
+# bash kept as fallback (some scripts assume /bin/bash).
+zsh
+bash
+
+# Basic editors
+# neovim installed via mise (see Containerfile.machine) — apt's version is too old (vim.uv missing).
+nano
+
+# Network fundamentals
+curl
+wget
+ca-certificates
+iproute2
+iptables
+
+# Dev essentials
+git
+
+# sudo — exec sessions run as the host user (--user uid:gid); sudo bridges to container root for package installs and podman operations.
+# NOPASSWD configured in Containerfile.machine.
+sudo
+
+# Podman-in-Podman (nested containers inside machines).
+# Runs rootful via sudo wrapper — no nested user namespace issues.
+podman
+crun
+slirp4netns
+uidmap
+fuse-overlayfs
+
+# BTRFS tools — inner daemon needs mkfs.btrfs to create its own BTRFS sparse image
+# for O(1) subvolume snapshots (recursive machine nesting).
+btrfs-progs
+
+# SFTP server — used by SSH Gateway for IDE file editing (VS Code / Windsurf / Cursor).
+# Part of openssh-sftp-server, no full sshd needed.
+openssh-sftp-server
+
+# socat — bidirectional TCP relay, used by SSH Gateway for port forwarding
+# into localhost-bound services inside containers.
+socat
+
+# FUSE client — AppImages, sshfs, archivemount, etc.
+# Pairs with /dev/fuse device passthrough in ContainerOpts.
+fuse3

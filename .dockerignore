@@ -1,0 +1,69 @@
+# Node modules
+**/node_modules
+**/.pnp
+**/.pnp.js
+
+# Testing
+**/coverage
+**/.nyc_output
+
+# Next.js
+**/.next
+**/out
+
+# Production builds
+**/build
+**/dist
+
+# Misc
+**/.DS_Store
+**/*.pem
+
+# Debug
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/.pnpm-debug.log*
+
+# Env files — every env (dev/staging/prod) supplies its own at runtime.
+# Never bake .env into the image; it overrides correct values from compose.
+**/.env
+**/.env.*
+
+# IDE
+**/.vscode
+**/.idea
+**/.claude
+*.swp
+*.swo
+
+# OS
+**/Thumbs.db
+
+# Git
+**/.git
+**/.gitignore
+
+# Documentation
+**/README.md
+**/*.md
+
+# Scripts that aren't needed in Docker
+scripts/
+
+# Sish runtime data (SSH keys written by daemon at runtime — never
+# part of the image, and including them causes a Tilt rebuild loop).
+sish/
+
+# Local runtime / data dirs (never part of the image).
+db/snapshots/
+local/
+.local/
+qdrant_storage/
+arrangement-split/
+terminal-poc/
+twitter/
+
+# Concatenated files for AI
+*.txt
+config.txt

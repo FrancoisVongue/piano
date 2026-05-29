@@ -1,0 +1,480 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Better-auth User model
+model User {
+  id                  String   @id @default(cuid())
+  email               String   @unique
+  emailVerified       Boolean  @default(false)
+  name                String?
+  image               String?
+  defaultSystemPrompt String?  @db.Text // Prepended to every AI run regardless of arrangement
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  sessions           Session[]
+  accounts           Account[]
+  notes              Note[]
+  arrangements       Arrangement[]
+  runs               Run[]
+  actions            Action[]
+  unifiers           Unifier[]
+  apiKeys            UserApiKey[]
+  machineTemplates   MachineTemplate[]
+  secrets            Secret[]
+  daemons            Daemon[]
+  daemonPairingCodes DaemonPairingCode[]
+  workflows          Workflow[]
+  machineApiTokens   MachineApiToken[]
+}
+
+// Supported AI providers for BYOK. Three direct providers + OpenRouter
+// as a router tier for models outside the main catalog. Each model in
+// LLM.MODELS declares which of these it needs.
+enum ApiKeyProvider {
+  OPENAI
+  ANTHROPIC
+  GOOGLE
+  OPENROUTER
+}
+
+// User's own API keys (BYOK - Bring Your Own Key)
+model UserApiKey {
+  id        String         @id @default(cuid())
+  provider  ApiKeyProvider
+  keyHash   String // Encrypted/hashed key for storage
+  keyPrefix String // First 8 chars for display (e.g., "sk-proj-...")
+  isActive  Boolean        @default(true)
+
+  // Which of this provider's models the user wants visible in their model
+  // picker. Seeded to "all models of this provider" on first insert so a
+  // user who only adds a key gets the full dropdown; user can later uncheck
+  // unwanted ones from Settings. Empty array = no models from this key.
+  enabledModelIds String[] @default([])
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, provider]) // One key per provider per user
+  @@index([userId])
+}
+
+// Better-auth Session model (stores refresh tokens)
+model Session {
+  id     String @id @default(cuid())
+  token  String @unique // This is the refresh token
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  userAgent String?
+  ipAddress String?
+
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Better-auth Account model (for OAuth providers later)
+model Account {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  accountId             String // ID from the auth provider
+  providerId            String // e.g., "email", "google", "github"
+  accessToken           String?   @db.Text
+  refreshToken          String?   @db.Text
+  idToken               String?   @db.Text
+  // Better-auth >=1.x renamed expiresAt → accessTokenExpiresAt and added
+  // refreshTokenExpiresAt + scope. Old `expiresAt` is gone.
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?   @db.Text
+  password              String? // For email/password auth
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([providerId, accountId])
+}
+
+// Better-auth Verification model — OAuth state/nonce storage, email-verify
+// tokens, password-reset tokens. Required by better-auth for any flow that
+// needs a one-time, time-bound token. Without it, social sign-in fails with
+// "Model verification does not exist in the database".
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+}
+
+model Arrangement {
+  id           String   @id @default(cuid())
+  title        String
+  pinned       Boolean  @default(false)
+  systemPrompt String?  @db.Text // Prepended to every AI run inside this arrangement
+  // Per-arrangement preferences (action visibility/order, model visibility/order).
+  // Shape: see Arrangement.Config in @piano/shared. JSONB so we can grow new
+  // sections (e.g. workspaces) without column churn.
+  config       Json?
+  tags         String[] @default([]) // Tags for categorization and filtering across all domains
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  notes Note[]
+  edges Edge[]
+
+  createdAt     DateTime  @default(now())
+  lastVisitedAt DateTime?
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+enum NoteType {
+  USER
+  ASSISTANT
+  SYSTEM
+  GROUP
+  MACHINE
+  TERMINAL
+  TEXT // Standalone text nodes rendered without a card — see domain/canvas/components/TextNode.tsx
+  ZONE // Resizable rectangle to group/organize the canvas (renders behind nodes)
+  DRAWING // Freehand stroke / straight line annotation; geometry lives in `style`
+}
+
+enum Status {
+  EXPECTING_AI_RESPONCE
+  FRESH_RESPONCE
+  RUNNING
+  FROZEN
+  PROVISIONING
+}
+
+model Note {
+  id                  String   @id @default(cuid())
+  type                NoteType @default(USER)
+  assistantProvider   String? // llm model used to generate this note
+  status              Status?
+  content             String // todo: constraint amount of context per node
+  label               String? // Optional label for high-level note identification
+  color               String? // Optional color for visual categorization
+  tags                String[] @default([]) // Tags for categorization and filtering
+  // Membership in 0..N layers. `[]` is the canonical "lives on every layer"
+  // shape — the note shows up regardless of which layer is active. Otherwise
+  // the canvas only renders the note when at least one of its layers is in
+  // the user's visible-layer set.
+  layers              String[] @default([])
+  pinned              Boolean  @default(false) // Pin important nodes
+  isMergePoint        Boolean  @default(false) // Allow multiple parent edges (DAG support)
+  ancestorOverride    String[] @default([]) // Explicit ancestor IDs to use instead of edge traversal
+  parentId            String? // For React Flow parent-child grouping (group nodes)
+  machineId           String? // For MACHINE type nodes - links to daemon machine ID
+  parentMachineNodeId String? // For branched machines - ID of the parent machine node
+  // Which paired daemon this MACHINE/TERMINAL note's machine lives on. Nullable
+  // for legacy notes created before multi-daemon support; new daemon-backed
+  // notes always carry this. Routing is rejected when null (orphaned machine).
+  daemonId            String?
+  daemon              Daemon?  @relation(fields: [daemonId], references: [id], onDelete: SetNull)
+  scale               Float    @default(1.0) // Visual scale of the note (0.1 to 2.0)
+  x                   Float
+  y                   Float
+  width               Float? // For resizable group nodes
+  height              Float? // For resizable group nodes
+  style               Json? // Per-node-type rendering metadata (e.g. TEXT nodes: { fontSize, fontWeight, fontFamily })
+  windowLayout        Json? // For MACHINE nodes: in-window tabs+splits + drawer state. See MachineWindow.Layout in @piano/shared.
+  // Per-model cache anchors. Shape: { [modelId]: { ttl, enabled } }. See
+  // Note.CacheConfig in @piano/shared for the contract and morphisms.
+  // Null when the note has no anchors for any model.
+  cacheConfig         Json?
+  version             Int      @default(1) // For optimistic sync and LWW conflict resolution
+
+  arrangementId String
+  arrangement   Arrangement @relation(fields: [arrangementId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  sourceForEdges Edge[] @relation("sources")
+  targetForEdges Edge[] @relation("targets")
+  versions       NoteVersion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([arrangementId])
+  @@index([status])
+  @@index([pinned])
+  @@index([parentId])
+  @@index([daemonId])
+  @@index([layers], type: Gin)
+}
+
+// Token that authorizes a process INSIDE a machine to call /api/canvas/*
+// for that machine's arrangement. Plaintext is shown ONCE at mint time
+// (returned in the response body and never persisted). We store the
+// sha256 hash and look up by that on every request.
+//
+// Lifecycle: revoke by deleting the row (or setting revokedAt). The Note
+// that owns the machine cascades to nothing automatically — orphan tokens
+// after machine delete are cleaned manually in MachineController.delete.
+// We accept that tradeoff because Note has no machineId FK either.
+model MachineApiToken {
+  id         String    @id @default(cuid())
+  machineId  String
+  tokenHash  String    @unique
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+
+  @@index([machineId])
+  @@index([userId])
+}
+
+// Historical snapshots of a Note's content for user-facing rollback.
+// Bounded to the last 4 per note; older are trimmed on insert. Within a
+// 30-second window of the previous snapshot we overwrite instead of
+// inserting (typing/AI bursts shouldn't fill the table with near-identical
+// rows). Only content is versioned for V1 — position/label changes don't
+// snap. Created by the canvas gateway PATCH and rollback paths.
+model NoteVersion {
+  id        String   @id @default(cuid())
+  noteId    String
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  content   String
+  // userId of the person OR machineId of the agent that wrote this
+  // version. Stored as opaque string — we never join on it, only display.
+  author    String?
+  createdAt DateTime @default(now())
+
+  @@index([noteId])
+  @@index([noteId, createdAt])
+}
+
+model Edge {
+  id String @id @default(cuid())
+
+  type           String
+  label          String
+  sourceHandleId String
+  targetHandleId String
+  version        Int    @default(1) // For optimistic sync and LWW conflict resolution
+
+  sourceId String
+  source   Note   @relation("sources", fields: [sourceId], references: [id], onDelete: Cascade)
+  targetId String
+  target   Note   @relation("targets", fields: [targetId], references: [id], onDelete: Cascade)
+
+  arrangementId String
+  arrangement   Arrangement @relation(fields: [arrangementId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([arrangementId])
+  @@index([sourceId, targetId])
+}
+
+model Run {
+  id            String @id @default(cuid())
+  noteId        String
+  arrangementId String
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  fullContext String @db.Text
+  response    String @db.Text
+  model       String
+  tokensUsed  Int    @default(0) // legacy — sum of input+output; keep until UI drops it
+
+  // Normalized usage split. cachedTokens is the subset of inputTokens that
+  // hit a provider cache. Cost is derived on-read via LLM.costFor().
+  inputTokens  Int @default(0)
+  outputTokens Int @default(0)
+  cachedTokens Int @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([noteId, createdAt])
+}
+
+model Action {
+  id   String @id @default(cuid())
+  name String // User-facing name, e.g., "Summarize"
+
+  // --- HOW it runs (Configuration) ---
+  useAncestors   Boolean @default(true) // Renamed from useBranch for clarity
+  resolveContent Boolean @default(true) // The crucial toggle we discussed
+
+  // --- WHAT it does (Logic & Output) ---
+  outputStyle ActionOutputStyle @default(SINGLE_CHILD)
+  prompt      String
+
+  // Relation
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
+
+// WHAT to do with the result
+enum ActionOutputStyle {
+  SINGLE_CHILD // Create one new child note (e.g., Play, Summarize)
+  MULTIPLE_CHILDREN // Create many new child notes (e.g., Split)
+  IN_PLACE // Modify the source note directly
+}
+
+// Unifier - works on multiple selected notes to synthesize/contract
+model Unifier {
+  id   String @id @default(cuid())
+  name String // User-facing name, e.g., "Summarize All", "Find Intersection"
+
+  // --- WHAT it does (Logic & Output) ---
+  outputStyle UnifierOutputStyle @default(SINGLE_NODE)
+  prompt      String // Predefined prompt template
+
+  // Relation
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
+
+// Output style for Unifiers
+enum UnifierOutputStyle {
+  SINGLE_NODE // Create one new note (e.g., Summarize, Find Intersection)
+  MULTIPLE_NODES // Create many new notes (e.g., Group by topic)
+}
+
+model MachineTemplate {
+  id               String  @id @default(cuid())
+  name             String
+  description      String?
+  icon             String?
+  color            String?
+  isSystem         Boolean @default(false)
+  parentTemplateId String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Daemon the template's overlay files live on. Templates are stored in
+  // `<daemon-layersDir>/templates/<id>/upper` — cross-daemon spawning
+  // would silently 404 the upper dir. Pinning the daemon here lets the
+  // picker only offer templates that can actually be materialised on the
+  // chosen host. Null = legacy / pre-multi-daemon templates; UI shows them
+  // with a "host unknown" warning and lets the user try anyway.
+  daemonId String?
+  daemon   Daemon? @relation(fields: [daemonId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([daemonId])
+}
+
+model Secret {
+  id    String @id @default(cuid())
+  key   String
+  value String
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, key])
+  @@index([userId])
+}
+
+// Runtime view of whether the backend currently holds an open WS for the
+// daemon. Persisted across restarts as the last known value.
+enum DaemonStatus {
+  ONLINE
+  OFFLINE
+}
+
+// A user-paired daemon process. Auths to the backend with a long-lived bearer
+// token; only the sha256 hash of the token lives here, the raw value is shown
+// to the user exactly once (during pair) and stored on the daemon host.
+model Daemon {
+  id             String       @id @default(cuid())
+  name           String
+  tokenHash      String       @unique
+  status         DaemonStatus @default(OFFLINE)
+  // User-controlled "don't dispatch new work to this daemon". Paused daemons
+  // stay in the list but disappear from the create-machine picker so existing
+  // machines keep working while the host is being maintained.
+  isPaused       Boolean      @default(false)
+  // Backend-allocated port on the shared sish reverse-tunnel host.
+  // Globally unique across all daemons in the installation.
+  sshPort        Int?         @unique
+  // Daemon-reported workdir inside its machines (typically the daemon
+  // host user's $HOME, since piano machines mount $HOME from host).
+  // formatSshInfo uses this for the "Open in Cursor/VSCode" URL path.
+  defaultWorkdir String?
+  lastSeenAt     DateTime?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  notes            Note[]
+  machineTemplates MachineTemplate[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+// One-time pairing code generated by the UI; consumed by the daemon CLI in
+// exchange for a long-lived token. Codes expire fast (~10 min).
+model DaemonPairingCode {
+  code       String    @id
+  name       String
+  expiresAt  DateTime
+  consumedAt DateTime?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// Workflow — declarative table-style automation. Levels are stored as one
+// JSON document because the shape evolves and they're always read/written
+// as a whole. See Workflow namespace in @piano/shared for the contract.
+model Workflow {
+  id        String   @id @default(cuid())
+  name      String
+  levels    Json     // Workflow.Level[]
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}

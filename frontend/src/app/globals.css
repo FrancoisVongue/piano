@@ -1,0 +1,442 @@
+@import "tailwindcss";
+
+/* Content sources for Tailwind v4 */
+@source "../app/**/*.{js,ts,jsx,tsx,mdx}";
+@source "../components/**/*.{js,ts,jsx,tsx,mdx}";
+@source "../domains/**/*.{js,ts,jsx,tsx,mdx}";
+@source "../shared/**/*.{js,ts,jsx,tsx,mdx}";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Piano Design System - Global Styles */
+/* All design tokens are defined in src/shared/design-system/tokens.ts */
+
+/* Tailwind v4 Theme Configuration */
+@theme {
+  /* Custom accent colors */
+  --color-accent: #047857;
+  --color-accent-hover: #064E3B;
+  --color-accent-light: #059669;
+  --color-accent-lighter: #10B981;
+  --color-accent-dark: #064E3B;
+  --color-accent-glow: rgba(4, 120, 87, 0.12);
+
+  /* Base colors */
+  --color-pure-white: #FFFFFF;
+  --color-off-white: #F8F9FA;
+  --color-soft-black: #1A1A23;
+
+  /* Background and surface */
+  --color-background: #F8F9FA;
+  --color-surface: #FFFFFF;
+
+  /* Semantic colors */
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-error: #DC2626;
+  --color-info: #0284C7;
+
+  /* State colors */
+  --color-state-thinking: #4B93F6;
+  --color-state-success: #10B981;
+  --color-state-error: #DC2626;
+  --color-state-warning: #F59E0B;
+
+  /* Text colors */
+  --color-text-primary: #1A1A23;
+  --color-text-secondary: #434339;
+  --color-text-muted: #5B5B52;
+  --color-text-disabled: #79796F;
+
+  /* Border colors */
+  --color-border: #D0D1CE;
+  --color-border-hover: #A9A9A3;
+  --color-border-focus: #15151F;
+  --color-border-accent: #047857;
+
+  /* Gray scale */
+  --color-gray-50: #F5F6F5;
+  --color-gray-100: #E7E8E6;
+  --color-gray-200: #D0D1CE;
+  --color-gray-300: #A9A9A3;
+  --color-gray-400: #79796F;
+  --color-gray-500: #5B5B52;
+  --color-gray-600: #434339;
+  --color-gray-700: #2F2F27;
+  --color-gray-800: #20201A;
+  --color-gray-900: #15151F;
+
+  /* Spacing */
+  --spacing-xs: 5px;
+  --spacing-sm: 8px;
+  --spacing-md: 13px;
+  --spacing-lg: 21px;
+  --spacing-xl: 34px;
+  --spacing-2xl: 55px;
+  --spacing-3xl: 89px;
+
+  /* Border radius */
+  --radius-xs: 4px;
+  --radius-sm: 5px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 13px;
+  --radius-2xl: 21px;
+
+  /* Width/Max-width utilities - Standard Tailwind sizes */
+  --width-xs: 20rem;  /* 320px */
+  --width-sm: 24rem;  /* 384px */
+  --width-md: 28rem;  /* 448px */
+  --width-lg: 32rem;  /* 512px */
+  --width-xl: 36rem;  /* 576px */
+  --width-2xl: 42rem; /* 672px */
+  --width-3xl: 48rem; /* 768px */
+  --width-4xl: 56rem; /* 896px */
+  --width-5xl: 64rem; /* 1024px */
+  --width-6xl: 72rem; /* 1152px */
+  --width-7xl: 80rem; /* 1280px */
+
+  /* Font sizes */
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-base: clamp(16px, 1rem + 0.5vw, 18px);
+  --font-size-lg: clamp(19px, 1.2rem + 0.5vw, 21px);
+  --font-size-xl: clamp(24px, 1.5rem + 0.5vw, 26px);
+  --font-size-2xl: clamp(30px, 2rem + 0.5vw, 34px);
+  --font-size-3xl: clamp(38px, 2.5rem + 0.5vw, 42px);
+  --font-size-4xl: clamp(48px, 3rem + 1vw, 55px);
+  --font-size-5xl: clamp(60px, 4rem + 1vw, 68px);
+
+  /* Font families */
+  --font-family-display: 'Bricolage Grotesque', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-family-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-family-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+
+  /* Width utilities */
+  --width-8: 2rem;
+  --width-full: 100%;
+
+  /* Max width utilities */
+  --max-width-2xl: 42rem;
+  --max-width-3xl: 48rem;
+  --max-width-4xl: 56rem;
+  --max-width-5xl: 64rem;
+  --max-width-6xl: 72rem;
+  --max-width-7xl: 80rem;
+}
+
+@layer base {
+  :root {
+    /* CSS Variables for JavaScript access */
+    --piano-background: #F8F9FA;
+    --piano-surface: #FFFFFF;
+    --piano-text: #1A1A23;
+
+    /* Core grays for UI */
+    --piano-gray-50: #F5F6F5;
+    --piano-gray-100: #E7E8E6;
+    --piano-gray-200: #D0D1CE;
+    --piano-gray-300: #A9A9A3;
+    --piano-gray-400: #79796F;
+    --piano-gray-500: #5B5B52;
+    --piano-gray-600: #434339;
+    --piano-gray-700: #2F2F27;
+    --piano-gray-800: #20201A;
+    --piano-gray-900: #15151F;
+
+    /* Accent color */
+    --piano-accent: #047857;
+    --piano-accent-hover: #064E3B;
+
+    /* Animation timings */
+    --piano-spring-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    --piano-spring-smooth: cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background: var(--piano-background);
+    color: var(--piano-text);
+    line-height: 1.6;
+  }
+
+  /* Focus styles */
+  :focus-visible {
+    outline: 2px solid var(--piano-accent);
+    outline-offset: 2px;
+  }
+
+  /* Selection styles */
+  ::selection {
+    background-color: var(--piano-accent);
+    color: white;
+  }
+
+  /* Respect motion preferences */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--piano-gray-50);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--piano-gray-300);
+    border-radius: 5px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--piano-gray-400);
+  }
+}
+
+@layer utilities {
+  /* Dot pattern background - matches Canvas component */
+  .dot-pattern {
+    background: radial-gradient(
+      circle,
+      rgba(208, 209, 206, 0.5) 1px,  /* 50% opacity for more subtle effect */
+      transparent 1px
+    ), var(--piano-background);
+    background-size: 20px 20px, auto;
+  }
+
+  /* Simple border glow animation */
+  @keyframes nodeGlow {
+    0% {
+      box-shadow: 0 0 20px rgba(16, 185, 129, 0.5), inset 0 0 20px rgba(16, 185, 129, 0.1);
+    }
+    100% {
+      box-shadow: 0 0 0 rgba(16, 185, 129, 0), inset 0 0 0 rgba(16, 185, 129, 0);
+    }
+  }
+
+  /* Container utilities for Tailwind v4 */
+  .container {
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .container {
+      max-width: 640px;
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .container {
+      max-width: 768px;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .container {
+      max-width: 1024px;
+      padding-left: 2rem;
+      padding-right: 2rem;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .container {
+      max-width: 1280px;
+    }
+  }
+
+  @media (min-width: 1536px) {
+    .container {
+      max-width: 1536px;
+    }
+  }
+
+  /* Width utilities */
+  .w-8 { width: 2rem; }
+  .h-8 { height: 2rem; }
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+
+}
+
+/* ============================================================
+ * Canvas LOD
+ *
+ * `[data-piano-node]` is the root every canvas node stamps on its outer div.
+ * `[data-low-detail]` is toggled imperatively only when that node crosses
+ * the zoom×scale LOD threshold. Pure-CSS swap between full-detail children
+ * and the simplified icon — zero React renders on zoom-bucket flip.
+ *
+ * No `content-visibility: auto` here: it implicitly applies
+ * `contain: paint`, which clips any descendant drawn outside the node's
+ * border-box. React Flow Handles sit half-outside via translate(-50%, ±50%),
+ * NoteCard's add-button hangs 60px below the card, and NodeExternalLabel
+ * floats above. All of those would get scissored off. The viewport
+ * culling that content-visibility buys is nice; visible UI affordances
+ * are not negotiable.
+ * ============================================================ */
+[data-piano-node] .piano-node-low { display: none; }
+[data-piano-node][data-low-detail] .piano-node-full { display: none; }
+[data-piano-node][data-low-detail] .piano-node-low { display: flex; }
+
+/* CRITICAL FIX: Override broken Tailwind v4 utilities */
+/* These must be at the END of the file to take precedence */
+.max-w-xs {
+  max-width: 20rem !important;
+}
+.max-w-sm {
+  max-width: 24rem !important;
+}
+.max-w-md {
+  max-width: 28rem !important;
+}
+.max-w-lg {
+  max-width: 32rem !important;
+}
+.max-w-xl {
+  max-width: 36rem !important;
+}

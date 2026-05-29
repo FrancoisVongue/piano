@@ -1,0 +1,2 @@
+# Compiled CLI binary — built via `just cli-build` / `just cli-install`.
+bin/

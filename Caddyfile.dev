@@ -1,0 +1,46 @@
+# Dev edge proxy — single origin in front of frontend + backend.
+#
+# Mirrors what staging/prod do (Caddy → containers), so cookies, CORS, and
+# OAuth redirect URIs work the same way locally. Without this, frontend on
+# :FRONTEND_PORT and backend on :BACKEND_PORT are different origins, which
+# triggers cookie-cross-port and state_mismatch headaches.
+#
+# Ports come from env vars (set by .envrc per slot).
+{
+	auto_https off
+	admin off
+}
+
+# Fallback to slot-0 default if CADDY_PORT isn't in env (forgot to
+# `direnv allow`). Without the fallback, an empty CADDY_PORT makes Caddy
+# default to :80/:443 — which then crashes with EACCES on bind.
+:{$CADDY_PORT:3009} {
+	# SSE — flush_interval -1 disables Caddy's default 200ms response buffering.
+	# Without this, server-sent events get coalesced and arrive in batches
+	# instead of in real time.
+	handle /events* {
+		reverse_proxy 127.0.0.1:{$BACKEND_PORT} {
+			flush_interval -1
+		}
+	}
+
+	handle /api/* {
+		reverse_proxy 127.0.0.1:{$BACKEND_PORT}
+	}
+
+	handle /health {
+		reverse_proxy 127.0.0.1:{$BACKEND_PORT}
+	}
+
+	# Everything else → frontend (Next.js dev server).
+	# Caddy auto-handles the WebSocket upgrade Next.js uses for HMR.
+	handle {
+		reverse_proxy 127.0.0.1:{$FRONTEND_PORT}
+	}
+
+	log {
+		output stdout
+		format console
+		level INFO
+	}
+}

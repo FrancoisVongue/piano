@@ -1,0 +1,45 @@
+.DS_Store  
+Thumbs.db  
+*~  
+
+cache.txt
+
+.vscode/  
+.idea/  
+.secrets
+**/.claude/
+
+node_modules/  
+npm-debug.log*  
+package-lock.json  
+
+qdrant_storage/
+
+dist/  
+build/  
+
+**/.env*
+!.envrc
+!.env.secrets.example
+.yoyo/
+
+# DB snapshots (force-add specific ones: git add -f db/snapshots/my-feature.sql)
+db/snapshots/
+*.diff
+*.txt
+arrangement-split/
+terminal-poc/
+.local/
+local/
+
+# sish runtime data (SSH keys generated at first run)
+sish/keys/
+sish/pubkeys/
+
+# Ad-hoc backup files (e.g. tailwind.config.ts.v3-backup) — never tracked.
+*-backup
+*.backup
+*.bak
+
+# Personal author scratchpad (notes, drafts) — not part of the project.
+twitter/

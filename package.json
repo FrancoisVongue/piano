@@ -1,0 +1,17 @@
+{
+  "name": "piano-monorepo",
+  "private": true,
+  "license": "Apache-2.0",
+  "workspaces": [
+    "frontend",
+    "backend",
+    "shared"
+  ],
+  "devDependencies": {
+    "husky": "^9.1.7"
+  },
+  "scripts": {
+    "typecheck": "pnpm -r typecheck",
+    "prepare": "husky"
+  }
+}

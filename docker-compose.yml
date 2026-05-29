@@ -1,0 +1,140 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: piano
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+  nats:
+    image: nats:latest
+    command: "-js"
+
+  temporal:
+    image: temporalio/auto-setup:latest
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PWD=postgres
+      - POSTGRES_SEEDS=postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  temporal-ui:
+    image: temporalio/ui:latest
+    ports:
+      - "8233:8080"
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+    depends_on:
+      - temporal
+
+  # SSH reverse-tunnel server for IDE access (VS Code / Cursor "Open in IDE").
+  # The daemon (running on Linux) connects here to register its SSH gateway.
+  # Pubkeys are stored in ./sish/pubkeys so the daemon can write its key from outside Docker.
+  sish:
+    image: antoniomika/sish:v2.22.1
+    ports:
+      - "2222:2222"
+      - "22000-22099:22000-22099"
+    volumes:
+      - ./sish/pubkeys:/pubkeys
+      - ./sish/keys:/keys
+    command: >
+      --ssh-address=:2222
+      --domain=localhost
+      --authentication=true
+      --authentication-keys-directory=/pubkeys
+      --private-keys-directory=/keys
+      --bind-random-ports=false
+      --bind-random-subdomains=false
+      --port-bind-range=22000-22099
+      --tcp-load-balancer=true
+      --idle-connection=false
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "3031:3031"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/piano
+      NATS_URL: nats://nats:4222
+      TEMPORAL_ADDRESS: temporal:7233
+      BETTER_AUTH_URL: ${PIANO_URL:-http://localhost:3009}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET is required — run ./scripts/generate-secrets.sh}
+      TRUSTED_ORIGINS: ${PIANO_URL:-http://localhost:3009}
+      API_KEY_ENCRYPTION_SECRET: ${API_KEY_ENCRYPTION_SECRET:?API_KEY_ENCRYPTION_SECRET is required — run ./scripts/generate-secrets.sh}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      PIANO_SISH_HOST: ${PIANO_SISH_HOST:-localhost}
+      PIANO_SISH_PORT_RANGE_START: 22000
+      PIANO_SISH_PORT_RANGE_END: 22099
+      PIANO_SSH_GATEWAY_PORT: 2200
+      PIANO_DEV_DAEMON_TOKEN: ${PIANO_DAEMON_TOKEN:?PIANO_DAEMON_TOKEN is required — run ./scripts/generate-secrets.sh}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_started
+      temporal:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3031/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  temporal-worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: ["sh", "-c", "pnpm prisma migrate deploy && pnpm worker"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/piano
+      NATS_URL: nats://nats:4222
+      TEMPORAL_ADDRESS: temporal:7233
+      BETTER_AUTH_URL: ${PIANO_URL:-http://localhost:3009}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      TRUSTED_ORIGINS: ${PIANO_URL:-http://localhost:3009}
+      API_KEY_ENCRYPTION_SECRET: ${API_KEY_ENCRYPTION_SECRET}
+      PIANO_SISH_HOST: ${PIANO_SISH_HOST:-localhost}
+      PIANO_SISH_PORT_RANGE_START: 22000
+      PIANO_SISH_PORT_RANGE_END: 22099
+      PIANO_DEV_DAEMON_TOKEN: ${PIANO_DAEMON_TOKEN}
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    depends_on:
+      - backend
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "${PIANO_PORT:-3009}:3009"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - backend
+      - frontend
+
+volumes:
+  postgres_data:

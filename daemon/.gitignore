@@ -1,0 +1,15 @@
+# Binary
+piano-daemon
+piano-terminal
+
+# Overlay layers (machine data, base rootfs)
+layers/
+
+# Go build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/

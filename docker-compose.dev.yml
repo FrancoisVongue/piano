@@ -1,0 +1,91 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-piano_dev}
+    ports:
+      - "${POSTGRES_PORT:-5444}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6389}:6379"
+    command: redis-server --appendonly yes --appendfsync no
+
+  nats:
+    image: nats:latest
+    command: "-js"  # Enable JetStream for priority queues
+    ports:
+      - "${NATS_CLIENT_PORT:-4222}:4222"
+      - "${NATS_MONITOR_PORT:-8222}:8222"
+
+  temporal:
+    image: temporalio/auto-setup:latest
+    ports:
+      - "${TEMPORAL_PORT:-7233}:7233"  # gRPC
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PWD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_SEEDS=postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  temporal-ui:
+    image: temporalio/ui:latest
+    ports:
+      - "${TEMPORAL_UI_PORT:-8233}:8080"  # UI
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - TEMPORAL_CORS_ORIGINS=http://localhost:${FRONTEND_PORT:-3032}
+    depends_on:
+      - temporal
+
+  # sish — self-hosted SSH reverse-tunnel server. Each piano-daemon process
+  # opens a reverse-SSH tunnel from inside its binary; sish forwards public
+  # TCP traffic on a backend-allocated port into that tunnel, which splices
+  # to the daemon's own SSH gateway on :2200.
+  #
+  # network_mode: host so the daemon can dial localhost:2222 directly and
+  # the public tunnel ports (22000-22099) bind to the host without docker
+  # NAT. Linux-only; matches the rest of this dev stack.
+  #
+  # Auth: sish reads pubkey files from ./local/sish/pubkeys/ — daemon's
+  # `--sish-pubkey-dest` flag drops its key here so no manual copy is needed.
+  sish:
+    # Pin a known-good version. `--idle-connection=false` is critical:
+    # the older flag `--idle-connection-timeout=0` SETS the timeout to
+    # 0ms (instant), which made every TCP forward die mid-banner with
+    # "read unix ...: i/o timeout". --idle-connection=false properly
+    # disables the idle check.
+    image: antoniomika/sish:v2.22.1
+    network_mode: host
+    volumes:
+      - ./local/sish/pubkeys:/pubkeys:ro
+      - ./local/sish/host-keys:/keys
+    command: >
+      --ssh-address=:2222
+      --domain=localhost
+      --authentication=true
+      --authentication-keys-directory=/pubkeys
+      --private-keys-directory=/keys
+      --bind-random-ports=false
+      --bind-random-subdomains=false
+      --port-bind-range=22000-22099
+      --tcp-load-balancer=true
+      --idle-connection=false
+
+
+volumes:
+  postgres_data:

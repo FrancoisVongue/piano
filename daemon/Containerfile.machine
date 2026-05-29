@@ -1,0 +1,98 @@
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Piano-base is self-contained: all tools live inside the image.
+# User installs extras via `sudo apt install` (persists in overlay upper).
+COPY packages.txt /tmp/packages.txt
+RUN apt-get update && \
+    grep -v '^#' /tmp/packages.txt | grep -v '^$' | \
+    xargs apt-get install -y && \
+    rm -rf /var/lib/apt/lists/* /tmp/packages.txt
+
+# Fix /tmp permissions (ubuntu:24.04 minimal ships 775, need 1777).
+RUN chmod 1777 /tmp
+
+# Passwordless sudo. Container runs as root but exec sessions run as
+# the host user (via --user uid:gid). sudo bridges the gap for apt install,
+# podman, and system-level operations.
+RUN echo 'ALL ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/99-piano && \
+    chmod 440 /etc/sudoers.d/99-piano
+
+# Nested Podman config. Container is rootful (no user namespace), so
+# nested podman runs rootful too — kernel overlay, no fuse, no VFS.
+#
+# containers.conf:
+#   cgroup_manager = "cgroupfs" (no systemd)
+#   events_logger = "file" (no journald)
+#   netns = "host" (share clone's network namespace)
+#   cgroups = "disabled" (read-only /sys/fs/cgroup)
+#
+# storage.conf:
+#   driver = "overlay" (kernel overlay — fast, native, no fuse)
+RUN mkdir -p /etc/containers/containers.conf.d && \
+    printf '[engine]\ncgroup_manager = "cgroupfs"\nevents_logger = "file"\n\n[containers]\nnetns = "host"\ncgroups = "disabled"\n' \
+      > /etc/containers/containers.conf.d/99-piano.conf && \
+    printf '[storage]\ndriver = "overlay"\nrunroot = "/run/containers/storage"\ngraphroot = "/var/lib/containers/storage"\n' \
+      > /etc/containers/storage.conf
+
+# Podman/Docker wrapper. Container is root so no sudo needed in wrapper.
+# `docker` symlink → same wrapper.
+COPY wrapper/podman-wrapper.sh /usr/local/bin/podman
+RUN chmod +x /usr/local/bin/podman && \
+    ln -s podman /usr/local/bin/docker
+
+# piano — the in-machine activity-signal primitive. Emits OSC escapes the
+# Piano host reads off the PTY stream (see wrapper/piano.sh).
+COPY wrapper/piano.sh /usr/local/bin/piano
+RUN chmod +x /usr/local/bin/piano
+
+# docker-compose v2 standalone binary (connects to podman via DOCKER_HOST).
+# Warning "Executing external compose provider" from Tilt is cosmetic —
+# it just means compose is a separate binary, not a Docker CLI plugin.
+RUN curl -SL "https://github.com/docker/compose/releases/download/v2.37.0/docker-compose-linux-x86_64" \
+      -o /usr/local/bin/docker-compose && \
+    chmod +x /usr/local/bin/docker-compose
+
+# DOCKER_HOST for docker-compose/Tilt. Socket started at container boot.
+RUN printf 'export DOCKER_HOST=unix:///run/podman/podman.sock\n' >> /etc/zsh/zshenv
+
+# mise — system-wide tool manager. Installed to /usr/local so all users share it.
+# Pre-install neovim (apt's nvim is 0.9 → vim.uv is nil; mise ships latest stable).
+ENV MISE_DATA_DIR=/usr/local/share/mise
+ENV MISE_CONFIG_DIR=/etc/mise
+ENV MISE_INSTALL_PATH=/usr/local/bin/mise
+RUN curl -fsSL https://mise.run | sh && \
+    mkdir -p /etc/mise && \
+    printf '[tools]\nneovim = "latest"\n' > /etc/mise/config.toml && \
+    mise install -y && \
+    ln -sf "$(mise which nvim)" /usr/local/bin/nvim && \
+    ln -sf /usr/local/bin/nvim /usr/local/bin/vim
+
+# Activate mise in zsh for all users (so `mise use -g <tool>` works interactively).
+RUN printf 'eval "$(/usr/local/bin/mise activate zsh)"\n' >> /etc/zsh/zshrc
+
+# Oh My Zsh + two near-universal plugins installed system-wide. Per-user
+# ~/.zshrc (seeded by piano-daemon when host has none — see daemon/overlay.go)
+# references ZSH=/usr/share/oh-my-zsh, so all machines get the framework
+# without each user having to install it.
+RUN git clone --depth=1 https://github.com/ohmyzsh/ohmyzsh.git /usr/share/oh-my-zsh && \
+    git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions \
+      /usr/share/oh-my-zsh/custom/plugins/zsh-autosuggestions && \
+    git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting \
+      /usr/share/oh-my-zsh/custom/plugins/zsh-syntax-highlighting && \
+    chmod -R a+rX /usr/share/oh-my-zsh
+
+# Piano: OSC 133 shell integration. The host derives idle/running + the last
+# command's exit code straight from the terminal stream — automatically, for
+# every command, with no caller required. preexec → command starts (running);
+# precmd → previous command finished (emit its exit code, then prompt = idle).
+RUN printf '%s\n' \
+    '__piano_preexec() { printf "\033]133;C\007" }' \
+    '__piano_precmd() { printf "\033]133;D;%s\007" "$?"; printf "\033]133;A\007" }' \
+    'typeset -ag preexec_functions precmd_functions' \
+    'preexec_functions+=(__piano_preexec)' \
+    'precmd_functions+=(__piano_precmd)' \
+    >> /etc/zsh/zshrc
+
+CMD ["/usr/bin/zsh"]

@@ -1,0 +1,32 @@
+{
+	auto_https off
+	admin off
+}
+
+:3009 {
+	# SSE — flush_interval -1 disables response buffering
+	handle /events* {
+		reverse_proxy backend:3031 {
+			flush_interval -1
+		}
+	}
+
+	handle /api/* {
+		reverse_proxy backend:3031
+	}
+
+	handle /health {
+		reverse_proxy backend:3031
+	}
+
+	# Everything else → Next.js frontend
+	handle {
+		reverse_proxy frontend:3000
+	}
+
+	log {
+		output stdout
+		format console
+		level INFO
+	}
+}
